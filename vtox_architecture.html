@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车联网分布式故障诊断系统架构分析</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        
+        h1, h2, h3, h4 {
+            color: #0066cc;
+            margin-top: 1.5em;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 1em;
+            padding-bottom: 0.5em;
+            border-bottom: 2px solid #0066cc;
+        }
+        
+        h2 {
+            font-size: 1.8em;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 0.3em;
+        }
+        
+        h3 {
+            font-size: 1.4em;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        .diagram-container {
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .diagram {
+            max-width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 5px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .feature-list {
+            background-color: #f0f7ff;
+            padding: 15px 25px;
+            border-radius: 5px;
+            border-left: 4px solid #0066cc;
+        }
+        
+        .highlight {
+            background-color: #ffffcc;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        code {
+            font-family: Consolas, Monaco, 'Andale Mono', monospace;
+            background-color: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 车联网分布式故障诊断系统架构分析</h1>
+        
+        <h2>📋 系统概述</h2>
+        <p>
+            本系统采用完整的分布式架构设计，实现了从数据采集、处理到前端展示的全流程分布式处理。系统支持多达50辆车的并发数据处理，
+            通过Redis Stream消费者组实现了高效的分布式数据处理，并通过优化的WebSocket实现了前端的高性能实时数据展示。
+        </p>
+        
+        <div class="diagram-container">
+            <h3>系统架构图</h3>
+            <img src="data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20style%3D%22width%3A0%3Bheight%3A0%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3C%2Fsvg%3E" alt="系统架构图" class="diagram mermaid">
+            <pre class="mermaid">
+graph TB
+    %% 数据源层
+    subgraph "数据源层 (Data Sources)"
+        VS[真实车辆模拟器<br/>realistic_vehicle_simulator.py<br/>🚗 支持50辆车<br/>- 10种车型<br/>- 分批启动机制<br/>- 随机发送间隔]
+        RV[真实车辆<br/>🚙 实际电机传感器]
+    end
+
+    %% API网关层
+    subgraph "API网关层 (API Gateway)"
+        FAPI[FastAPI后端服务<br/>main.py<br/>🌐 HTTP/WebSocket]
+    end
+
+    %% 消息队列层  
+    subgraph "消息队列层 (Message Queue)"
+        subgraph "Redis Streams"
+            RS1[motor_raw_data<br/>📥 原始电机数据流]
+            RS2[fault_diagnosis_results<br/>📤 故障诊断结果流]
+            RS3[vehicle_health_assessments<br/>💚 车辆健康评估流]
+            RS4[performance_metrics<br/>📊 性能监控流]
+            RS5[system_alerts<br/>🚨 系统告警流]
+        end
+        
+        subgraph "消费者组 (Consumer Groups)"
+            CG1[turn_fault_diagnosis_group<br/>⚡ 匝间短路诊断组]
+            CG2[insulation_diagnosis_group<br/>🔌 绝缘失效诊断组]
+            CG3[bearing_diagnosis_group<br/>⚙️ 轴承故障诊断组]
+            CG4[eccentricity_diagnosis_group<br/>🔄 偏心故障诊断组]
+            CG5[broken_bar_diagnosis_group<br/>🔗 断条故障诊断组]
+            CG6[result_aggregation_group<br/>📋 结果聚合组]
+        end
+    end
+
+    %% 分布式处理层
+    subgraph "分布式处理层 (Distributed Processing)"
+        subgraph "故障诊断消费者 (2个/故障类型)"
+            C1["turn_fault_consumer_001<br/>turn_fault_consumer_002"]
+            C2["insulation_consumer_001<br/>insulation_consumer_002"]
+            C3["bearing_consumer_001<br/>bearing_consumer_002"]
+            C4["eccentricity_consumer_001<br/>eccentricity_consumer_002"]
+            C5["broken_bar_consumer_001<br/>broken_bar_consumer_002"]
+        end
+        
+        AG[结果聚合器<br/>aggregator_001]
+    end
+
+    %% 前端层
+    subgraph "前端层 (Frontend)"
+        WS[WebSocket管理器<br/>webSocketManager.js<br/>- 高性能批处理<br/>- 三级处理模式<br/>- 缓冲区优化]
+        DM[数据管理器<br/>dataManager.js<br/>- 全局状态管理<br/>- 数据压缩优化]
+        
+        subgraph "UI组件 (Vue Components)"
+            DP[分布式系统面板<br/>DistributedSystemPanel]
+            RT[实时监控组件<br/>RealTimeMonitor]
+            FM[车队监控<br/>FleetDistributedMonitor]
+            HC[高性能图表<br/>HighPerformanceLineChart]
+        end
+    end
+
+    %% 数据流向
+    VS --> FAPI
+    RV --> FAPI
+    FAPI --> RS1
+    
+    RS1 --> CG1
+    RS1 --> CG2
+    RS1 --> CG3
+    RS1 --> CG4
+    RS1 --> CG5
+    
+    CG1 --> C1
+    CG2 --> C2
+    CG3 --> C3
+    CG4 --> C4
+    CG5 --> C5
+    
+    C1 --> RS2
+    C2 --> RS2
+    C3 --> RS2
+    C4 --> RS2
+    C5 --> RS2
+    
+    RS2 --> CG6
+    CG6 --> AG
+    
+    AG --> RS3
+    AG --> RS5
+    
+    C1 --> RS4
+    C2 --> RS4
+    C3 --> RS4
+    C4 --> RS4
+    C5 --> RS4
+    
+    RS2 --> WS
+    RS3 --> WS
+    RS4 --> WS
+    RS5 --> WS
+    
+    WS --> DM
+    DM --> DP
+    DM --> RT
+    DM --> FM
+    DM --> HC
+
+    %% 样式
+    classDef source fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef api fill:#bbf,stroke:#33f,stroke-width:2px;
+    classDef queue fill:#bfb,stroke:#3a3,stroke-width:2px;
+    classDef consumer fill:#fbb,stroke:#a33,stroke-width:2px;
+    classDef frontend fill:#bff,stroke:#33a,stroke-width:2px;
+    
+    class VS,RV source;
+    class FAPI api;
+    class RS1,RS2,RS3,RS4,RS5,CG1,CG2,CG3,CG4,CG5,CG6 queue;
+    class C1,C2,C3,C4,C5,AG consumer;
+    class WS,DM,DP,RT,FM,HC frontend;
+            </pre>
+        </div>
+        
+        <div class="diagram-container">
+            <h3>数据流程图</h3>
+            <img src="data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20style%3D%22width%3A0%3Bheight%3A0%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3C%2Fsvg%3E" alt="数据流程图" class="diagram mermaid">
+            <pre class="mermaid">
+sequenceDiagram
+    participant VS as 车辆模拟器<br/>(50辆车)
+    participant API as API网关<br/>(FastAPI)
+    participant RS as Redis Streams
+    participant C as 分布式消费者<br/>(10个处理单元)
+    participant AG as 结果聚合器
+    participant WS as WebSocket服务
+    participant FE as 前端应用<br/>(Vue.js)
+    
+    Note over VS,FE: 完整数据流程
+    
+    VS->>API: 1. 发送传感器数据<br/>(异步HTTP请求)
+    API->>RS: 2. 写入原始数据流<br/>(motor_raw_data)
+    
+    Note over RS,C: 并行处理阶段
+    RS-->>C: 3. 分发消息到10个消费者<br/>(5种故障类型×2消费者)
+    
+    C->>C: 4. 执行故障诊断算法
+    C->>RS: 5. 写入诊断结果<br/>(fault_diagnosis_results)
+    C->>RS: 6. 记录性能指标<br/>(performance_metrics)
+    
+    RS-->>AG: 7. 聚合诊断结果
+    AG->>AG: 8. 计算综合健康评分
+    AG->>RS: 9. 写入健康评估<br/>(vehicle_health_assessments)
+    AG->>RS: 10. 发送严重告警<br/>(system_alerts)
+    
+    RS-->>WS: 11. 推送实时数据
+    WS->>FE: 12. WebSocket消息<br/>(批处理优化)
+    
+    FE->>FE: 13. 数据管理器处理
+    FE->>FE: 14. 更新UI组件<br/>(防抖渲染)
+            </pre>
+        </div>
+
+        <h2>🔍 分布式架构详细分析</h2>
+        
+        <h3>1. 数据生产者层</h3>
+        <div class="feature-list">
+            <p><strong>多车辆并行模拟：</strong></p>
+            <ul>
+                <li>支持同时模拟多达50辆车</li>
+                <li>每辆车作为独立的数据生产者，通过异步任务并行运行</li>
+                <li>支持10种不同车型，分布在不同地区</li>
+            </ul>
+            
+            <p><strong>负载均衡机制：</strong></p>
+            <ul>
+                <li>分批启动机制：每5辆车间隔2秒启动，避免瞬时负载过高</li>
+                <li>随机发送间隔：每辆车使用1.5-2.5秒的随机间隔发送数据</li>
+                <li>数据生成器支持多种故障类型和动态故障状态变化</li>
+            </ul>
+            
+            <p><strong>数据发送优化：</strong></p>
+            <ul>
+                <li>异步HTTP客户端发送数据到后端API</li>
+                <li>错误处理和重试机制确保数据可靠传输</li>
+                <li>批量数据处理减少网络开销</li>
+            </ul>
+        </div>
+        
+        <h3>2. 数据消费者层</h3>
+        <div class="feature-list">
+            <p><strong>消费者组模型：</strong></p>
+            <ul>
+                <li>为5种故障类型分别创建独立的消费者组</li>
+                <li>每种故障类型有2个并行消费者实例，形成"5种故障×2消费者=10个处理单元"的架构</li>
+                <li>消费者ID格式如：<code>turn_fault_consumer_001</code>、<code>turn_fault_consumer_002</code>等</li>
+            </ul>
+            
+            <p><strong>分布式处理流程：</strong></p>
+            <ul>
+                <li>原始数据流入Redis Stream</li>
+                <li>Redis自动将消息分配给不同消费者，实现负载均衡</li>
+                <li>消费者并行处理不同消息，提高系统吞吐量</li>
+                <li>处理结果写入结果流，由结果聚合器进一步处理</li>
+            </ul>
+            
+            <p><strong>结果聚合机制：</strong></p>
+            <ul>
+                <li>专门的结果聚合器消费所有故障诊断结果</li>
+                <li>计算车辆综合健康评分</li>
+                <li>发布综合评估结果和告警信息</li>
+            </ul>
+            
+            <p><strong>性能监控：</strong></p>
+            <ul>
+                <li>记录处理时间和吞吐量等性能指标</li>
+                <li>自动发布性能指标到监控流</li>
+                <li>支持系统状态查询和统计</li>
+            </ul>
+        </div>
+        
+        <h3>3. 前端显示层</h3>
+        <div class="feature-list">
+            <p><strong>WebSocket高性能管理器：</strong></p>
+            <ul>
+                <li><code>webSocketManager.js</code> 实现了高性能的WebSocket连接管理</li>
+                <li>消息缓冲区和批处理机制优化数据处理</li>
+                <li>三级处理模式（正常、极速、超极速）根据负载自动切换</li>
+                <li>自动重连和心跳检测确保连接可靠性</li>
+            </ul>
+            
+            <p><strong>数据流优化：</strong></p>
+            <ul>
+                <li>批量处理和防抖机制减少DOM更新频率</li>
+                <li>数据压缩和优化传输减少带宽占用</li>
+                <li>队列和缓存机制处理高并发数据流</li>
+            </ul>
+            
+            <p><strong>分布式系统监控面板：</strong></p>
+            <ul>
+                <li><code>DistributedSystemPanel</code> 组件监控分布式系统状态</li>
+                <li>实时显示各消费者组的工作状态和性能指标</li>
+                <li>支持初始化、启动和停止分布式系统</li>
+            </ul>
+            
+            <p><strong>高性能图表和数据处理：</strong></p>
+            <ul>
+                <li>使用优化的图表组件显示实时数据</li>
+                <li>智能数据处理和合并减少渲染开销</li>
+                <li>分布式数据源的统一管理和显示</li>
+            </ul>
+        </div>
+        
+        <h2>🚀 分布式架构的关键特性</h2>
+        
+        <table>
+            <tr>
+                <th>特性</th>
+                <th>实现方式</th>
+                <th>优势</th>
+            </tr>
+            <tr>
+                <td>水平扩展能力</td>
+                <td>
+                    <ul>
+                        <li>消费者数量可配置，支持动态扩展</li>
+                        <li>数据生产者（车辆模拟器）可以灵活增减</li>
+                        <li>前端组件设计支持大规模数据显示</li>
+                    </ul>
+                </td>
+                <td>系统容量可以通过增加节点线性扩展，无需重构架构</td>
+            </tr>
+            <tr>
+                <td>容错机制</td>
+                <td>
+                    <ul>
+                        <li>消费者崩溃时，其他消费者继续工作</li>
+                        <li>自动重新连接和恢复处理</li>
+                        <li>消息确认机制确保不丢失数据</li>
+                    </ul>
+                </td>
+                <td>系统具有高可用性，单点故障不会导致整体系统崩溃</td>
+            </tr>
+            <tr>
+                <td>负载均衡</td>
+                <td>
+                    <ul>
+                        <li>Redis Stream自动分配消息给可用消费者</li>
+                        <li>数据生产者随机化发送间隔避免峰值负载</li>
+                        <li>前端批处理和防抖机制平滑处理数据流</li>
+                    </ul>
+                </td>
+                <td>工作负载均匀分布，避免单个节点过载，提高整体系统性能</td>
+            </tr>
+            <tr>
+                <td>实时性能优化</td>
+                <td>
+                    <ul>
+                        <li>前端WebSocket管理器根据负载自动调整处理模式</li>
+                        <li>后端异步处理提高并发能力</li>
+                        <li>数据缓存和批处理减少系统开销</li>
+                    </ul>
+                </td>
+                <td>系统能够处理高并发实时数据流，保持低延迟响应</td>
+            </tr>
+        </table>
+        
+        <h2>📊 性能指标</h2>
+        <p>
+            系统在10辆车并发场景下的性能表现：
+        </p>
+        <ul>
+            <li>单消费者处理能力：约10条消息/秒</li>
+            <li>双消费者处理能力：约20条消息/秒（2倍提升）</li>
+            <li>前端WebSocket处理能力：高达8000条消息/秒（理论值）</li>
+            <li>前端批处理优化：每500ms更新一次，减少90%的DOM操作</li>
+        </ul>
+        
+        <h2>🔍 总结</h2>
+        <p>
+            该系统实现了完整的分布式架构，从数据生产者到数据消费者再到前端显示，每一层都采用了分布式设计模式。
+            系统能够支持多车辆并发数据生成、多消费者并行处理和高性能前端实时显示，特别适合车联网这种高并发、实时性要求高的应用场景。
+        </p>
+        <p>
+            关键技术包括Redis Stream消费者组、异步处理、WebSocket实时推送、批处理和防抖等性能优化技术。
+            系统设计充分考虑了扩展性、容错性和性能，能够有效应对高并发负载。
+        </p>
+    </div>
+    
+    <div class="footer">
+        <p>© 2024 车联网分布式故障诊断系统 | 架构分析报告</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'Microsoft YaHei, sans-serif'
+        });
+    </script>
+</body>
+</html> 

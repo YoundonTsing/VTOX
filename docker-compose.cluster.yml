@@ -1,0 +1,382 @@
+# VTOX 分布式微服务集群 - Docker Compose 配置
+# 
+# 功能特点:
+# - 完整微服务架构部署
+# - 自动服务发现和负载均衡  
+# - Redis持久化和集群支持
+# - 健康检查和自动重启
+# - 资源限制和性能优化
+# - 开发/生产环境兼容
+
+version: '3.8'
+
+services:
+  # Redis 服务 - 核心消息队列和服务注册
+  redis:
+    image: redis:7.2-alpine
+    container_name: vtox-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - vtox_network
+    restart: unless-stopped
+
+  # API Gateway - 统一入口和路由
+  api_gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    container_name: vtox-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_TYPE=gateway
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./backend:/app
+    command: >
+      python -m uvicorn app.main:app 
+      --host 0.0.0.0 
+      --port 8000 
+      --reload
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # 诊断协调器 - 任务分发和负载均衡
+  coordinator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    container_name: vtox-coordinator
+    ports:
+      - "8001:8001"
+    environment:
+      - SERVICE_TYPE=coordinator
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+      - COORDINATOR_HOST=0.0.0.0
+      - COORDINATOR_PORT=8001
+    volumes:
+      - ./backend:/app
+    command: python cluster/start_coordinator.py
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis; redis.Redis('redis', 6379).ping()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # Worker节点 - 匝间短路故障诊断
+  worker_turn_fault:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    environment:
+      - SERVICE_TYPE=worker
+      - REDIS_URL=redis://redis:6379
+      - WORKER_ID=worker_turn_fault
+      - FAULT_TYPES=turn_fault
+      - WORKER_HOST=0.0.0.0
+      - WORKER_PORT=8002
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./backend:/app
+    command: >
+      python cluster/start_worker.py 
+      --worker-id worker_turn_fault
+      --fault-types turn_fault
+      --host 0.0.0.0
+      --port 8002
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_started
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2  # 启动2个实例
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 384M
+
+  # Worker节点 - 绝缘失效诊断
+  worker_insulation:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    environment:
+      - SERVICE_TYPE=worker
+      - REDIS_URL=redis://redis:6379
+      - WORKER_ID=worker_insulation
+      - FAULT_TYPES=insulation
+      - WORKER_HOST=0.0.0.0
+      - WORKER_PORT=8003
+    volumes:
+      - ./backend:/app
+    command: >
+      python cluster/start_worker.py 
+      --worker-id worker_insulation
+      --fault-types insulation
+      --host 0.0.0.0
+      --port 8003
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_started
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 384M
+
+  # Worker节点 - 轴承故障诊断
+  worker_bearing:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    environment:
+      - SERVICE_TYPE=worker
+      - REDIS_URL=redis://redis:6379
+      - WORKER_ID=worker_bearing
+      - FAULT_TYPES=bearing
+      - WORKER_HOST=0.0.0.0
+      - WORKER_PORT=8004
+    volumes:
+      - ./backend:/app
+    command: >
+      python cluster/start_worker.py 
+      --worker-id worker_bearing
+      --fault-types bearing
+      --host 0.0.0.0
+      --port 8004
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_started
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 384M
+
+  # Worker节点 - 偏心故障诊断
+  worker_eccentricity:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    environment:
+      - SERVICE_TYPE=worker
+      - REDIS_URL=redis://redis:6379
+      - WORKER_ID=worker_eccentricity
+      - FAULT_TYPES=eccentricity
+      - WORKER_HOST=0.0.0.0
+      - WORKER_PORT=8005
+    volumes:
+      - ./backend:/app
+    command: >
+      python cluster/start_worker.py 
+      --worker-id worker_eccentricity
+      --fault-types eccentricity
+      --host 0.0.0.0
+      --port 8005
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_started
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 384M
+
+  # Worker节点 - 断条故障诊断
+  worker_broken_bar:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    environment:
+      - SERVICE_TYPE=worker
+      - REDIS_URL=redis://redis:6379
+      - WORKER_ID=worker_broken_bar
+      - FAULT_TYPES=broken_bar
+      - WORKER_HOST=0.0.0.0
+      - WORKER_PORT=8006
+    volumes:
+      - ./backend:/app
+    command: >
+      python cluster/start_worker.py 
+      --worker-id worker_broken_bar
+      --fault-types broken_bar
+      --host 0.0.0.0
+      --port 8006
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_started
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 384M
+
+  # 监控和维护服务
+  monitor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    container_name: vtox-monitor
+    environment:
+      - SERVICE_TYPE=monitor
+      - REDIS_URL=redis://redis:6379
+      - MONITOR_HOST=0.0.0.0
+      - MONITOR_PORT=8011
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./backend:/app
+    command: python cluster/start_monitor.py
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # WebSocket桥接服务
+  websocket_bridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.microservice
+    container_name: vtox-websocket-bridge
+    ports:
+      - "8012:8012"
+    environment:
+      - SERVICE_TYPE=bridge
+      - REDIS_URL=redis://redis:6379
+      - BRIDGE_HOST=0.0.0.0
+      - BRIDGE_PORT=8012
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./backend:/app
+    command: python cluster/start_bridge.py
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 384M
+
+  # Nginx 负载均衡器 (可选)
+  nginx:
+    image: nginx:alpine
+    container_name: vtox-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - api_gateway
+    networks:
+      - vtox_network
+    restart: unless-stopped
+    profiles:
+      - production  # 仅在生产环境启动
+
+# 网络配置
+networks:
+  vtox_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# 数据卷配置
+volumes:
+  redis_data:
+    driver: local
+  logs_data:
+    driver: local
+
+# 扩展配置
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# 默认环境变量
+x-common-variables: &common-variables
+  PYTHONPATH: /app
+  PYTHONUNBUFFERED: 1
+  TZ: Asia/Shanghai

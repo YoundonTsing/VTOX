@@ -1,0 +1,7 @@
+{
+  "external_rag_env": "C:/Projects/RAG_Anything/rag_env",
+  "rag_anything_path": "C:/Projects/RAG_Anything",
+  "use_external_env": true,
+  "working_dir": "./backend/rag_storage",
+  "vector_db_path": "./backend/rag_storage/vector_db"
+}

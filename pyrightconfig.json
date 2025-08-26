@@ -1,0 +1,38 @@
+{
+  "include": [
+    "backend",
+    "cluster", 
+    "frontend"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*"
+  ],
+  "extraPaths": [
+    "./backend",
+    "./cluster"
+  ],
+  "pythonVersion": "3.10",
+  "pythonPlatform": "Windows",
+  "executionEnvironments": [
+    {
+      "root": "./backend",
+      "pythonVersion": "3.10",
+      "extraPaths": [
+        "."
+      ]
+    },
+    {
+      "root": "./cluster", 
+      "pythonVersion": "3.10",
+      "extraPaths": [
+        "../backend"
+      ]
+    }
+  ],
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true,
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false
+}

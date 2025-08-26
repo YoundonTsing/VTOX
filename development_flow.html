@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>匝间短路模拟检查系统开发流程</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3, h4 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            margin-top: 40px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .phase {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: Consolas, Monaco, 'Andale Mono', monospace;
+            background-color: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .architecture-diagram {
+            max-width: 100%;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>匝间短路模拟检查系统开发流程</h1>
+    <p>本文档描述了基于Vue3+Vite前端和FastAPI后端的匝间短路检测系统的完整开发流程。</p>
+
+    <div class="phase">
+        <h2>1. 项目概述</h2>
+        <p><strong>项目目标：</strong>开发一个Web应用，用于上传电机运行数据CSV文件，分析电机是否存在匝间短路故障。</p>
+        <p><strong>技术栈：</strong></p>
+        <ul>
+            <li><strong>前端：</strong>Vue3 + Vite + Axios</li>
+            <li><strong>后端：</strong>Python FastAPI + Pandas + Scipy</li>
+        </ul>
+    </div>
+
+    <div class="phase">
+        <h2>2. 系统架构设计</h2>
+        <div class="architecture-diagram">
+            <pre>
+┌───────────────┐      ┌───────────────────────┐      ┌─────────────────┐
+│               │      │                       │      │                 │
+│   Vue3前端    │───→ │   FastAPI后端服务     │───→ │   数据分析引擎   │
+│               │      │                       │      │                 │
+└───────────────┘      └───────────────────────┘      └─────────────────┘
+       ↑                          │                          │
+       │                          │                          │
+       └──────────────────────────┴──────────────────────────┘
+                                  ↓
+                       ┌───────────────────────┐
+                       │                       │
+                       │   分析结果与可视化    │
+                       │                       │
+                       └───────────────────────┘</pre>
+        </div>
+        <p><strong>前后端通信：</strong>RESTful API</p>
+        <p><strong>数据流：</strong>CSV上传 → 数据解析 → 特征提取 → 故障评分 → 结果返回 → 可视化展示</p>
+    </div>
+
+    <div class="phase">
+        <h2>3. 开发阶段规划</h2>
+        <table>
+            <tr>
+                <th>阶段</th>
+                <th>工作内容</th>
+                <th>预计时间</th>
+            </tr>
+            <tr>
+                <td>项目初始化</td>
+                <td>搭建前后端基础框架</td>
+                <td>1天</td>
+            </tr>
+            <tr>
+                <td>后端开发</td>
+                <td>实现数据处理和故障诊断算法</td>
+                <td>3天</td>
+            </tr>
+            <tr>
+                <td>前端开发</td>
+                <td>文件上传和结果展示界面</td>
+                <td>2天</td>
+            </tr>
+            <tr>
+                <td>集成测试</td>
+                <td>前后端联调与测试</td>
+                <td>1天</td>
+            </tr>
+            <tr>
+                <td>优化完善</td>
+                <td>性能优化和UI美化</td>
+                <td>1天</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="phase">
+        <h2>4. 详细接口设计</h2>
+        <h3>4.1 文件上传接口</h3>
+        <pre>
+URL: /analyze
+Method: POST
+请求格式: multipart/form-data
+参数:
+  - file: CSV文件
+响应格式: JSON
+{
+  "score": 0.75,           // 故障概率分数 (0~1)
+  "status": "WARNING",     // 状态: NORMAL, WARNING, FAULT
+  "features": {
+    "I2_avg": 0.12,        // 负序电流平均值
+    "I2_max": 0.18,        // 负序电流最大值
+    "unbalance_avg": 8.2,  // 电流不平衡度平均值
+    "unbalance_max": 12.5, // 电流不平衡度最大值
+    "kurtosis_delta_iq": 3.8, // ΔI_q的峭度
+    "delta_eta_avg": -0.03,   // 效率残差平均值
+    "delta_I2_avg": 0.05       // I₂残差平均值
+  }
+}</pre>
+    </div>
+
+    <div class="phase">
+        <h2>5. CSV文件格式要求</h2>
+        <p>上传的CSV文件必须包含以下列：</p>
+        <pre>
+timestamp, Ia, Ib, Ic, Vdc, Torque, Speed, Iq_actual, Iq_ref, I2_ref, Eta_ref
+2023-01-01 00:00:00, 10.2, 10.1, 10.3, 600, 150, 3000, 5.1, 5.0, 0.02, 0.92
+2023-01-01 00:00:01, 10.3, 10.0, 10.4, 600, 152, 3010, 5.2, 5.1, 0.021, 0.91
+...</pre>
+        <p><strong>参数说明：</strong></p>
+        <table>
+            <tr>
+                <th>字段</th>
+                <th>描述</th>
+                <th>单位</th>
+            </tr>
+            <tr>
+                <td>timestamp</td>
+                <td>时间戳</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>Ia, Ib, Ic</td>
+                <td>三相电流</td>
+                <td>A</td>
+            </tr>
+            <tr>
+                <td>Vdc</td>
+                <td>母线电压</td>
+                <td>V</td>
+            </tr>
+            <tr>
+                <td>Torque</td>
+                <td>转矩</td>
+                <td>Nm</td>
+            </tr>
+            <tr>
+                <td>Speed</td>
+                <td>转速</td>
+                <td>rpm</td>
+            </tr>
+            <tr>
+                <td>Iq_actual</td>
+                <td>实际q轴电流</td>
+                <td>A</td>
+            </tr>
+            <tr>
+                <td>Iq_ref</td>
+                <td>参考q轴电流</td>
+                <td>A</td>
+            </tr>
+            <tr>
+                <td>I2_ref</td>
+                <td>参考负序电流</td>
+                <td>A</td>
+            </tr>
+            <tr>
+                <td>Eta_ref</td>
+                <td>参考效率</td>
+                <td>-</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="phase">
+        <h2>6. 故障诊断算法</h2>
+        <h3>6.1 特征参数计算</h3>
+        <ul>
+            <li><strong>负序电流分量 I₂：</strong>
+                <pre>I_positive = (Ia + a*Ib + a²*Ic) / 3   (a = e^(j120°))
+I_negative = (Ia + a²*Ib + a*Ic) / 3
+I₂ = |I_negative|</pre>
+            </li>
+            <li><strong>电流不平衡度：</strong>
+                <pre>Unbalance = [max(Ia, Ib, Ic) - min(Ia, Ib, Ic)] / I_avg * 100%</pre>
+            </li>
+            <li><strong>ΔI_q峭度计算：</strong>
+                <pre>ΔI_q = Iq_actual - Iq_ref
+Kurtosis = E[(ΔI_q - μ)⁴]/σ⁴ - 3  // μ为均值，σ为标准差</pre>
+            </li>
+        </ul>
+
+        <h3>6.2 故障概率评分</h3>
+        <pre>P_fault = w₁ · sigmoid(I₂/I₂_ref) + w₂ · (ΔI₂/ΔI₂_ref) + w₃ · (Unbalance/Unbalance_ref) + w₄ · (Kurtosis(ΔI_q)/K_ref)</pre>
+        <p>权重值(w₁, w₂, w₃, w₄)需根据历史数据训练确定。</p>
+
+        <h3>6.3 故障判断标准</h3>
+        <ul>
+            <li><strong>正常(NORMAL):</strong> P_fault < 0.3</li>
+            <li><strong>预警(WARNING):</strong> 0.3 ≤ P_fault < 0.7</li>
+            <li><strong>故障(FAULT):</strong> P_fault ≥ 0.7</li>
+        </ul>
+    </div>
+
+    <div class="phase">
+        <h2>7. 开发流程与任务列表</h2>
+        <h3>7.1 后端开发任务</h3>
+        <ol>
+            <li>搭建FastAPI基本框架</li>
+            <li>实现文件上传和解析功能</li>
+            <li>开发特征参数计算模块</li>
+            <li>实现故障评分算法</li>
+            <li>完成API接口与错误处理</li>
+            <li>API测试与优化</li>
+        </ol>
+
+        <h3>7.2 前端开发任务</h3>
+        <ol>
+            <li>创建Vue3项目框架</li>
+            <li>开发文件上传组件</li>
+            <li>实现结果可视化展示</li>
+            <li>添加进度指示器和错误处理</li>
+            <li>优化用户界面和交互体验</li>
+            <li>前端功能测试</li>
+        </ol>
+
+        <h3>7.3 集成测试</h3>
+        <ol>
+            <li>前后端接口联调</li>
+            <li>端到端功能测试</li>
+            <li>边界条件和异常情况处理</li>
+            <li>性能和可用性测试</li>
+        </ol>
+    </div>
+
+    <div class="phase">
+        <h2>8. 部署方案</h2>
+        <h3>8.1 开发环境</h3>
+        <pre>
+# 后端依赖
+pip install fastapi uvicorn python-multipart pandas scipy numpy
+
+# 前端依赖
+npm install vue axios vue-router echarts</pre>
+
+        <h3>8.2 生产环境部署</h3>
+        <pre>
+# 后端部署
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+
+# 前端构建
+npm run build
+
+# 前端部署
+nginx或其他Web服务器部署dist目录</pre>
+    </div>
+
+    <div class="phase">
+        <h2>9. 后续优化方向</h2>
+        <ul>
+            <li><strong>算法优化：</strong>通过实际案例数据训练并优化特征权重</li>
+            <li><strong>功能扩展：</strong>支持更多类型的电机故障诊断</li>
+            <li><strong>数据可视化：</strong>添加时序数据图表和特征相关性分析</li>
+            <li><strong>批量处理：</strong>支持多文件批量分析和结果比较</li>
+            <li><strong>历史数据：</strong>建立历史诊断结果数据库以跟踪变化趋势</li>
+            <li><strong>实时监控：</strong>发展为实时监控系统，与SCADA系统集成</li>
+        </ul>
+    </div>
+
+    <footer>
+        <p><strong>版本：</strong>1.0</p>
+        <p><strong>最后更新：</strong>2023年10月31日</p>
+    </footer>
+</body>
+</html> 

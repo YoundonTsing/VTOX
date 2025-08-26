@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>有限 SCADA 数据下的电机故障诊断技术方案</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        h1, h2, h3, h4 {
+            color: #2c3e50;
+            margin-top: 1.2em;
+        }
+        ul, ol {
+            margin-left: 1.4em;
+        }
+        code, pre {
+            background: #f5f5f5;
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-family: "Courier New", monospace;
+        }
+        pre {
+            padding: 10px;
+            overflow-x: auto;
+        }
+        strong {
+            color: #c0392b;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e0e0e0;
+            margin: 2em 0;
+        }
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .feature-table th, .feature-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .feature-table th {
+            background-color: #f2f2f2;
+        }
+        .algorithm-box {
+            background-color: #f9f9f9;
+            border-left: 4px solid #2c3e50;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>匝间短路故障诊断算法方案</h1>
+
+<p>本文档详细介绍了基于有限SCADA数据的电机匝间短路故障诊断算法方案，包括算法原理、特征提取、故障评分计算和诊断流程。</p>
+
+<h2>一、算法原理概述</h2>
+
+<p>匝间短路是电机常见的绝缘故障，其特征是定子绕组中的两个或多个导线因绝缘损坏而短路，导致电流路径异常。由于SCADA系统数据有限（通常仅包含三相电流、母线电压、转速、扭矩等），我们采用<strong>多特征融合</strong>和<strong>模型残差分析</strong>的方法进行诊断。</p>
+
+<div class="algorithm-box">
+    <p><strong>核心思想：</strong> 通过分析电机正常运行与实际运行之间的<strong>偏差</strong>，结合电机电磁学原理，从有限数据中提取能够反映匝间短路特征的指标。</p>
+</div>
+
+<h2>二、关键特征提取</h2>
+
+<p>匝间短路主要表现为电机三相不平衡、负序分量增加、效率下降等特征。我们提取以下关键特征：</p>
+
+<h3>1. 负序电流分量</h3>
+<div class="algorithm-box">
+    <pre><code>// 计算负序电流分量
+a = complex(-0.5, 0.866)  // 1∠120° = -0.5 + j0.866
+a2 = complex(-0.5, -0.866)  // 1∠240° = -0.5 - j0.866
+
+// 对每行数据计算
+I_positive = (Ia + a * Ib + a2 * Ic) / 3
+I_negative = (Ia + a2 * Ib + a * Ic) / 3
+
+// 计算负序电流平均值
+I2_avg = 平均值(|I_negative|)
+
+// 计算负序/正序比值
+I2_I1_ratio = |I_negative| / |I_positive|</code></pre>
+</div>
+
+<p><strong>物理意义：</strong> 理想对称三相系统的负序分量为零。匝间短路会破坏三相平衡，导致负序分量增加。</p>
+
+<h3>2. 电流不平衡度</h3>
+<div class="algorithm-box">
+    <pre><code>// 计算电流不平衡度
+unbalance = (max(Ia, Ib, Ic) - min(Ia, Ib, Ic)) / ((Ia + Ib + Ic) / 3) * 100%
+
+// 计算平均不平衡度
+unbalance_avg = 平均值(unbalance)</code></pre>
+</div>
+
+<p><strong>物理意义：</strong> 匝间短路会导致故障相电流异常，使三相电流不平衡度增加。</p>
+
+<h3>3. ΔI_q峭度</h3>
+<div class="algorithm-box">
+    <pre><code>// 计算q轴电流残差
+delta_iq = Iq_actual - Iq_ref
+
+// 计算峭度 = [平均(x-μ)^4] / [平均(x-μ)^2]^2 - 3
+mean = 平均值(delta_iq)
+diff_squared = (delta_iq - mean)^2
+diff_fourth = (delta_iq - mean)^4
+kurtosis_delta_iq = 平均值(diff_fourth) / 平均值(diff_squared)^2 - 3</code></pre>
+</div>
+
+<p><strong>物理意义：</strong> 峭度反映数据分布的"尖峰性"，匝间短路会导致电流波形异常，产生尖峰，使峭度值增大。</p>
+
+<h3>4. 效率残差</h3>
+<div class="algorithm-box">
+    <pre><code>// 计算实际效率（如果有相关数据）
+eta_actual = (Torque * Speed * 2π/60) / (电功率)
+
+// 效率残差
+delta_eta_avg = eta_actual - eta_ref</code></pre>
+</div>
+
+<p><strong>物理意义：</strong> 匝间短路会增加铜损，导致电机效率下降，效率残差为负且绝对值增大。</p>
+
+<h2>三、故障评分计算</h2>
+
+<p>将各特征参数归一化并加权计算综合故障评分：</p>
+
+<div class="algorithm-box">
+    <pre><code>// 使用sigmoid函数将各特征映射到0-1区间
+function sigmoid(x, scale=1) {
+    return 1 / (1 + exp(-scale * x))
+}
+
+// 各特征权重
+weights = {
+    "I2_avg": 0.25,
+    "I2_I1_ratio": 0.2,
+    "unbalance_avg": 0.2,
+    "kurtosis_delta_iq": 0.25,
+    "delta_eta_avg": 0.1
+}
+
+// 计算各特征得分
+score_i2 = sigmoid((I2_avg - THRESHOLD_I2_avg) / THRESHOLD_I2_avg * 5)
+score_i2_ratio = sigmoid((I2_I1_ratio - THRESHOLD_I2_I1_ratio) / THRESHOLD_I2_I1_ratio * 5)
+score_unbalance = sigmoid((unbalance_avg - THRESHOLD_unbalance_avg) / THRESHOLD_unbalance_avg * 5)
+score_kurtosis = sigmoid((kurtosis_delta_iq - THRESHOLD_kurtosis_delta_iq) / THRESHOLD_kurtosis_delta_iq * 5)
+
+// 效率残差是负值，需要反向处理
+score_eta = sigmoid((THRESHOLD_delta_eta_avg - delta_eta_avg) / |THRESHOLD_delta_eta_avg| * 5)
+
+// 加权计算总分
+total_score = weights["I2_avg"] * score_i2 +
+             weights["I2_I1_ratio"] * score_i2_ratio +
+             weights["unbalance_avg"] * score_unbalance +
+             weights["kurtosis_delta_iq"] * score_kurtosis +
+             weights["delta_eta_avg"] * score_eta
+
+// 确保分数在0-1范围内
+fault_score = min(max(total_score, 0), 1)</code></pre>
+</div>
+
+<h3>诊断阈值</h3>
+
+<table class="feature-table">
+    <tr>
+        <th>特征参数</th>
+        <th>阈值</th>
+        <th>物理意义</th>
+    </tr>
+    <tr>
+        <td>I2_avg（负序电流平均值）</td>
+        <td>0.05</td>
+        <td>正常电机负序电流应小于5%</td>
+    </tr>
+    <tr>
+        <td>I2_I1_ratio（负序/正序比值）</td>
+        <td>0.02</td>
+        <td>正常电机负序/正序比值应小于2%</td>
+    </tr>
+    <tr>
+        <td>unbalance_avg（电流不平衡度）</td>
+        <td>5.0%</td>
+        <td>正常电机三相电流不平衡度应小于5%</td>
+    </tr>
+    <tr>
+        <td>kurtosis_delta_iq（ΔI_q峭度）</td>
+        <td>3.0</td>
+        <td>正态分布的峭度为3，大于3表示有异常尖峰</td>
+    </tr>
+    <tr>
+        <td>delta_eta_avg（效率残差）</td>
+        <td>-0.03</td>
+        <td>效率下降超过3%可能表明有故障</td>
+    </tr>
+</table>
+
+<h2>四、故障等级判定</h2>
+
+<p>根据计算的故障评分，将电机状态分为三级：</p>
+
+<div class="algorithm-box">
+    <pre><code>// 故障等级判定
+if (fault_score >= 0.7) {
+    status = "FAULT"     // 故障
+} else if (fault_score >= 0.3) {
+    status = "WARNING"   // 警告
+} else {
+    status = "NORMAL"    // 正常
+}</code></pre>
+</div>
+
+<h2>五、诊断流程</h2>
+
+<ol>
+    <li><strong>数据采集：</strong> 获取三相电流、母线电压、转速、扭矩等SCADA数据</li>
+    <li><strong>数据预处理：</strong> 数据清洗、缺失值处理、标准化</li>
+    <li><strong>特征提取：</strong> 计算负序电流、电流不平衡度、ΔI_q峭度、效率残差等特征</li>
+    <li><strong>故障评分计算：</strong> 将特征归一化并加权计算综合故障评分</li>
+    <li><strong>故障等级判定：</strong> 根据故障评分确定电机状态（正常/警告/故障）</li>
+    <li><strong>结果输出：</strong> 生成诊断报告，包含故障评分、状态和关键特征值</li>
+</ol>
+
+<h2>六、算法优势与限制</h2>
+
+<h3>优势</h3>
+<ul>
+    <li><strong>多特征融合：</strong> 综合考虑多种匝间短路特征，提高诊断准确性</li>
+    <li><strong>适应性强：</strong> 通过归一化和权重调整，适应不同类型和规格的电机</li>
+    <li><strong>实时性好：</strong> 算法计算量小，可实现实时监测</li>
+    <li><strong>早期预警：</strong> 能够捕捉匝间短路早期特征，实现预防性维护</li>
+</ul>
+
+<h3>限制</h3>
+<ul>
+    <li><strong>数据依赖：</strong> 诊断效果受SCADA数据质量和完整性影响</li>
+    <li><strong>阈值设定：</strong> 需要根据不同电机特性调整阈值参数</li>
+    <li><strong>干扰因素：</strong> 电网谐波、负载波动等可能影响诊断准确性</li>
+</ul>
+
+<h2>七、实际应用建议</h2>
+
+<ul>
+    <li><strong>参数校准：</strong> 在正常运行状态下收集基准数据，校准阈值参数</li>
+    <li><strong>趋势分析：</strong> 关注特征参数的变化趋势，而非单次测量值</li>
+    <li><strong>交叉验证：</strong> 结合温度、振动等其他可用数据进行交叉验证</li>
+    <li><strong>动态阈值：</strong> 根据电机运行工况动态调整阈值，提高适应性</li>
+</ul>
+
+<hr>
+
+<h2>附录：诊断结果示例</h2>
+
+                <pre><code>{
+  "timestamp": "2025-07-23T18:05:49.472Z",
+  "motor_id": "M101",
+  "fault_score": 0.586,
+  "status": "WARNING",
+  "features": {
+    "I2_avg": 0.047,
+    "I2_I1_ratio": 0.021,
+    "unbalance_avg": 8.108,
+    "kurtosis_delta_iq": -1.281,
+    "delta_eta_avg": -0.093
+  },
+  "thresholds": {
+    "I2_avg": 0.05,
+    "I2_I1_ratio": 0.02,
+    "unbalance_avg": 5.0,
+    "kurtosis_delta_iq": 3.0,
+    "delta_eta_avg": -0.03
+  }
+}</code></pre>
+
+<p><strong>诊断结论：</strong> 电机处于警告状态，电流不平衡度(8.108%)显著高于阈值(5.0%)，负序/正序电流比值(0.021)略高于阈值(0.02)，效率残差(-0.093)明显低于阈值(-0.03)，建议密切监控并安排检修。</p>
+
+</body>
+</html>

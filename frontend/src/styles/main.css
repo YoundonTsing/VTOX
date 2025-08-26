@@ -1,0 +1,120 @@
+/* 全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+  background-color: #f5f7fa;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app-header {
+  background-color: #409EFF;
+  color: white;
+  padding: 15px 0;
+  margin-bottom: 20px;
+}
+
+.app-header h1 {
+  text-align: center;
+}
+
+/* 卡片样式 */
+.card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  padding: 20px;
+}
+
+/* 文件上传区域 */
+.upload-area {
+  border: 2px dashed #dcdfe6;
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.upload-area:hover {
+  border-color: #409EFF;
+}
+
+/* 结果展示区 */
+.result-card {
+  margin-top: 30px;
+}
+
+.gauge-container {
+  margin: 20px 0;
+}
+
+/* 故障状态颜色 */
+.status-normal {
+  color: #67C23A;
+}
+
+.status-warning {
+  color: #E6A23C;
+}
+
+.status-fault {
+  color: #F56C6C;
+}
+
+/* 特征参数表格 */
+.feature-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.feature-table th,
+.feature-table td {
+  padding: 12px;
+  border-bottom: 1px solid #EBEEF5;
+  text-align: left;
+}
+
+.feature-table th {
+  font-weight: bold;
+  background-color: #F5F7FA;
+}
+
+/* 仪表盘样式 */
+.gauge {
+  width: 100%;
+  height: 30px;
+  background-color: #f5f5f5;
+  border-radius: 15px;
+  margin: 10px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.gauge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #67C23A, #E6A23C, #F56C6C);
+  transition: width 0.5s ease;
+}
+
+.gauge-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #333;
+  font-weight: bold;
+} 

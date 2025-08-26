@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车联网分布式电机故障诊断系统 - 完整架构分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 25px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #3498db;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h3 {
+            color: #34495e;
+            font-size: 1.4em;
+            margin: 25px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .section h4 {
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin: 20px 0 10px 0;
+        }
+
+        .architecture-diagram {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
+            border: 2px dashed #3498db;
+        }
+
+        .layer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .layer-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #dee2e6;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .layer-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .layer-card h4 {
+            color: #495057;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f4;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .tech-highlights {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .tech-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            transform: perspective(1000px) rotateY(0deg);
+            transition: transform 0.3s ease;
+        }
+
+        .tech-card:hover {
+            transform: perspective(1000px) rotateY(5deg) translateY(-10px);
+        }
+
+        .tech-card i {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .tech-card h4 {
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .data-flow {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            line-height: 2;
+            color: #1565c0;
+            border: 2px solid #2196f3;
+        }
+
+        .deployment-arch {
+            background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            color: #4a148c;
+            border-left: 5px solid #9c27b0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+            transition: border-color 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: #3498db;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+            display: block;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            border-radius: 0 0 20px 20px;
+        }
+
+        .icon {
+            margin-right: 8px;
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+            border-left: 4px solid #4299e1;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .header {
+                padding: 20px;
+                border-radius: 15px 15px 0 0;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .layer-grid,
+            .tech-highlights,
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 动画效果 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .section:nth-child(2) { animation-delay: 0.1s; }
+        .section:nth-child(3) { animation-delay: 0.2s; }
+        .section:nth-child(4) { animation-delay: 0.3s; }
+        .section:nth-child(5) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-car icon"></i>车联网分布式电机故障诊断系统</h1>
+            <div class="subtitle">完整架构分析与技术文档 | 基于Redis Stream的高性能分布式架构</div>
+        </div>
+
+        <div class="content">
+            <!-- 系统概述 -->
+            <div class="section">
+                <h2><i class="fas fa-info-circle icon"></i>系统概述</h2>
+                <p>这是一个<span class="highlight">企业级的现代化车联网故障诊断系统</span>，采用<strong>微服务架构、事件驱动设计</strong>，实现了高并发处理、实时响应、智能分析和可视化展示的完整能力。系统专门针对电机故障检测优化，支持5种主要故障类型的并行诊断，可同时处理<strong>10辆车的实时数据</strong>。</p>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-number">5</span>
+                        <div class="stat-label">故障类型</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">50Hz</span>
+                        <div class="stat-label">采样频率</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">10</span>
+                        <div class="stat-label">车辆支持</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">8</span>
+                        <div class="stat-label">架构层次</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统架构图 -->
+            <div class="section">
+                <h2><i class="fas fa-sitemap icon"></i>系统架构图</h2>
+                <div class="architecture-diagram">
+                    <div class="mermaid">
+graph TB
+    %% 数据源层
+    subgraph "数据源层 (Data Sources)"
+        VS[真实车辆模拟器<br/>realistic_vehicle_simulator.py<br/>🚗 10种车型支持<br/>- 50Hz采样率<br/>- 动态故障注入<br/>- 真实车牌号生成<br/>- 负载均衡优化]
+        RV[真实车辆<br/>🚙 实际电机传感器<br/>- 电流传感器<br/>- 振动传感器<br/>- 温度传感器]
+    end
+
+    %% 网关层
+    subgraph "API网关层 (API Gateway)"
+        FAPI[FastAPI后端服务<br/>main.py<br/>🌐 HTTP/WebSocket<br/>- CORS配置<br/>- 认证授权<br/>- 路由管理]
+    end
+
+    %% 消息队列层  
+    subgraph "消息队列层 (Message Queue)"
+        subgraph "Redis Streams"
+            RS1[motor_raw_data<br/>📥 原始电机数据流]
+            RS2[fault_diagnosis_results<br/>📤 故障诊断结果流]
+            RS3[vehicle_health_assessments<br/>💚 车辆健康评估流]
+            RS4[performance_metrics<br/>📊 性能监控流]
+            RS5[system_alerts<br/>🚨 系统告警流]
+        end
+        
+        subgraph "消费者组 (Consumer Groups)"
+            CG1[turn_fault_diagnosis_group<br/>⚡ 匝间短路诊断组]
+            CG2[insulation_diagnosis_group<br/>🔌 绝缘失效诊断组]
+            CG3[bearing_diagnosis_group<br/>⚙️ 轴承故障诊断组]
+            CG4[eccentricity_diagnosis_group<br/>🔄 偏心故障诊断组]
+            CG5[broken_bar_diagnosis_group<br/>🔗 断条故障诊断组]
+            CG6[result_aggregation_group<br/>📋 结果聚合组]
+        end
+    end
+
+    %% 分布式处理层
+    subgraph "分布式处理层 (Distributed Processing)"
+        subgraph "故障分析器集群 (Fault Analyzers)"
+            AN1[TurnFaultAnalyzer<br/>⚡ 匝间短路分析器<br/>- 电流不平衡检测<br/>- 三次谐波分析<br/>- 负序分量分析]
+            AN2[InsulationAnalyzer<br/>🔌 绝缘失效分析器<br/>- 绝缘电阻监测<br/>- 泄漏电流分析<br/>- 介质损耗计算]
+            AN3[BearingAnalyzer<br/>⚙️ 轴承故障分析器<br/>- 振动信号处理<br/>- 冲击因子计算<br/>- 特征频率检测]
+            AN4[EccentricityAnalyzer<br/>🔄 偏心故障分析器<br/>- 静态偏心检测<br/>- 动态偏心分析<br/>- 偏心指数计算]
+            AN5[BrokenBarAnalyzer<br/>🔗 断条故障分析器<br/>- 边带频率分析<br/>- 断条指数计算<br/>- 故障严重程度评估]
+        end
+        
+        AGG[结果聚合器<br/>📊 Aggregator<br/>- 多故障融合<br/>- 健康评分计算<br/>- 综合状态评估]
+    end
+
+    %% 数据桥接层
+    subgraph "数据桥接层 (Data Bridge)"
+        BRIDGE[Stream-Frontend Bridge<br/>🌉 流前端桥接器<br/>- Redis Stream监听<br/>- WebSocket转发<br/>- 轻量级数据转换]
+    end
+
+    %% 通信层
+    subgraph "实时通信层 (Real-time Communication)"
+        WS[WebSocket管理器<br/>🔗 realtime_diagnosis.py<br/>- 连接管理<br/>- 数据队列<br/>- 性能监控]
+    end
+
+    %% 前端层
+    subgraph "前端展示层 (Frontend)"
+        subgraph "Vue.js应用"
+            UI1[综合实时诊断界面<br/>📊 CombinedRealTimeDiagnosis.vue<br/>- 分布式系统面板<br/>- 性能监控面板<br/>- 关键警报面板]
+            UI2[单项故障诊断界面<br/>🔍 专项诊断视图<br/>- 轴承诊断<br/>- 匝间短路诊断<br/>- 绝缘失效诊断等]
+        end
+        
+        DM[数据管理器<br/>💾 dataManager.js<br/>- 内存优化<br/>- 数据压缩<br/>- 性能监控]
+        
+        WSM[WebSocket管理器<br/>🔗 webSocketManager.js<br/>- 连接管理<br/>- 自动重连<br/>- 消息队列]
+    end
+
+    %% 基础设施层
+    subgraph "基础设施层 (Infrastructure)"
+        REDIS[(Redis 7<br/>💾 持久化存储<br/>- Stream数据结构<br/>- 消费者组<br/>- 健康检查)]
+        DOCKER[Docker容器<br/>🐳 容器化部署<br/>- Redis容器<br/>- RedisInsight管理]
+    end
+
+    %% 数据流连接
+    VS -->|HTTP POST<br/>批量传感器数据| FAPI
+    RV -->|HTTP POST<br/>实时传感器数据| FAPI
+    
+    FAPI -->|发布数据| RS1
+    
+    RS1 -->|消费| CG1
+    RS1 -->|消费| CG2  
+    RS1 -->|消费| CG3
+    RS1 -->|消费| CG4
+    RS1 -->|消费| CG5
+    
+    CG1 -->|执行分析| AN1
+    CG2 -->|执行分析| AN2
+    CG3 -->|执行分析| AN3
+    CG4 -->|执行分析| AN4
+    CG5 -->|执行分析| AN5
+    
+    AN1 -->|发布结果| RS2
+    AN2 -->|发布结果| RS2
+    AN3 -->|发布结果| RS2
+    AN4 -->|发布结果| RS2
+    AN5 -->|发布结果| RS2
+    
+    RS2 -->|聚合| CG6
+    CG6 -->|执行聚合| AGG
+    AGG -->|发布评估| RS3
+    AGG -->|发布警报| RS5
+    
+    RS2 -->|监听| BRIDGE
+    RS3 -->|监听| BRIDGE
+    RS5 -->|监听| BRIDGE
+    
+    BRIDGE -->|WebSocket转发| WS
+    WS -->|实时推送| DM
+    WS -->|实时推送| WSM
+    
+    DM -->|数据管理| UI1
+    DM -->|数据管理| UI2
+    WSM -->|连接管理| UI1
+    WSM -->|连接管理| UI2
+    
+    %% 基础设施连接
+    RS1 -.->|存储| REDIS
+    RS2 -.->|存储| REDIS
+    RS3 -.->|存储| REDIS
+    RS4 -.->|存储| REDIS
+    RS5 -.->|存储| REDIS
+    REDIS -.->|部署| DOCKER
+
+    %% 样式定义
+    classDef dataSource fill:#e1f5fe
+    classDef apiGateway fill:#f3e5f5
+    classDef messageQueue fill:#fff3e0
+    classDef processing fill:#e8f5e8
+    classDef bridge fill:#fce4ec
+    classDef frontend fill:#f1f8e9
+    classDef infrastructure fill:#f5f5f5
+
+    class VS,RV dataSource
+    class FAPI apiGateway
+    class RS1,RS2,RS3,RS4,RS5,CG1,CG2,CG3,CG4,CG5,CG6 messageQueue
+    class AN1,AN2,AN3,AN4,AN5,AGG processing
+    class BRIDGE,WS bridge
+    class UI1,UI2,DM,WSM frontend
+    class REDIS,DOCKER infrastructure
+                    </div>
+                </div>
+            </div>
+
+            <!-- 架构层次详解 -->
+            <div class="section">
+                <h2><i class="fas fa-layer-group icon"></i>架构层次详解</h2>
+                
+                <div class="layer-grid">
+                    <div class="layer-card">
+                        <h4><i class="fas fa-database icon"></i>数据源层</h4>
+                        <ul class="feature-list">
+                            <li>真实车辆模拟器 (realistic_vehicle_simulator.py)</li>
+                            <li>10种车型：海豹、秦、汉、唐、宋、元、海豚、海鸥、护卫舰07、驱逐舰05</li>
+                            <li>支持1-10辆车并发模拟</li>
+                            <li>50Hz高频采样，动态故障注入</li>
+                            <li>真实车牌号格式生成</li>
+                            <li>负载均衡优化，分批启动</li>
+                            <li>支持实际车辆传感器接入</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-server icon"></i>API网关层</h4>
+                        <ul class="feature-list">
+                            <li>FastAPI高性能Web框架</li>
+                            <li>RESTful API + WebSocket双向通信</li>
+                            <li>JWT认证授权机制</li>
+                            <li>CORS跨域支持</li>
+                            <li>异步请求处理</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-stream icon"></i>消息队列层</h4>
+                        <ul class="feature-list">
+                            <li>Redis Streams核心架构</li>
+                            <li>5个专用数据流</li>
+                            <li>6个独立消费者组</li>
+                            <li>负载均衡与容错机制</li>
+                            <li>水平扩展支持</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-cogs icon"></i>分布式处理层</h4>
+                        <ul class="feature-list">
+                            <li>5种专业故障分析器</li>
+                            <li>并行诊断处理</li>
+                            <li>智能结果聚合</li>
+                            <li>综合健康评分算法</li>
+                            <li>关键告警触发机制</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-bridge icon"></i>数据桥接层</h4>
+                        <ul class="feature-list">
+                            <li>轻量级桥接组件</li>
+                            <li>Redis Stream实时监听</li>
+                            <li>零计算数据转发</li>
+                            <li>WebSocket高效推送</li>
+                            <li>避免性能瓶颈</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-wifi icon"></i>实时通信层</h4>
+                        <ul class="feature-list">
+                            <li>WebSocket连接池管理</li>
+                            <li>数据队列缓冲</li>
+                            <li>自适应处理速率</li>
+                            <li>连接状态监控</li>
+                            <li>自动重连机制</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-desktop icon"></i>前端展示层</h4>
+                        <ul class="feature-list">
+                            <li>Vue.js响应式应用</li>
+                            <li>综合实时诊断界面</li>
+                            <li>专项故障诊断视图</li>
+                            <li>高性能图表组件</li>
+                            <li>智能数据管理</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-cloud icon"></i>基础设施层</h4>
+                        <ul class="feature-list">
+                            <li>Redis 7集群部署</li>
+                            <li>Docker容器化架构</li>
+                            <li>RedisInsight可视化管理</li>
+                            <li>数据持久化存储</li>
+                            <li>健康检查机制</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 核心技术特点 -->
+            <div class="section">
+                <h2><i class="fas fa-rocket icon"></i>核心技术特点</h2>
+                
+                <h3>分布式架构优势</h3>
+                <div class="tech-highlights">
+                    <div class="tech-card">
+                        <i class="fas fa-expand-arrows-alt"></i>
+                        <h4>水平扩展</h4>
+                        <p>每种故障类型可独立扩展消费者，支持动态负载调节</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-shield-alt"></i>
+                        <h4>容错机制</h4>
+                        <p>Consumer Group保证消息不丢失，支持故障自动恢复</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-balance-scale"></i>
+                        <h4>负载均衡</h4>
+                        <p>Redis Stream自动分发消息，确保处理负载均匀分布</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-puzzle-piece"></i>
+                        <h4>解耦设计</h4>
+                        <p>分析器间完全独立，支持独立开发、部署和维护</p>
+                    </div>
+                </div>
+
+                <h3>高性能优化</h3>
+                <div class="tech-highlights">
+                    <div class="tech-card">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <h4>智能采样</h4>
+                        <p>前端数据管理器实现自适应采样，保留关键特征</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-compress-alt"></i>
+                        <h4>数据压缩</h4>
+                        <p>优化传输量，减少网络带宽占用</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-memory"></i>
+                        <h4>内存管理</h4>
+                        <p>自动清理机制，防止内存泄漏</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-sliders-h"></i>
+                        <h4>动态调节</h4>
+                        <p>根据负载动态调整处理频率</p>
+                    </div>
+                </div>
+
+                <h3>实时性保障</h3>
+                <div class="tech-highlights">
+                    <div class="tech-card">
+                        <i class="fas fa-stopwatch"></i>
+                        <h4>50Hz采样</h4>
+                        <p>满足电机故障检测精度要求</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-bolt"></i>
+                        <h4>毫秒级延迟</h4>
+                        <p>Redis Stream + WebSocket实现</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-route"></i>
+                        <h4>直接转发</h4>
+                        <p>桥接组件避免二次计算</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-sync-alt"></i>
+                        <h4>异步处理</h4>
+                        <p>全异步架构，无阻塞处理</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据流程 -->
+            <div class="section">
+                <h2><i class="fas fa-flow-chart icon"></i>数据流程</h2>
+                <div class="data-flow">
+                    车辆传感器 → FastAPI → Redis Stream → 分布式分析器集群<br/>
+                    ↓<br/>
+                    结果聚合 → 健康评估 → 桥接转发 → WebSocket → 前端实时展示
+                </div>
+
+                <h3>详细处理流程</h3>
+                <ol>
+                    <li><strong>数据采集</strong>：车辆传感器以50Hz频率采集电机运行数据</li>
+                    <li><strong>数据传输</strong>：通过HTTP POST将批量数据发送到FastAPI</li>
+                    <li><strong>消息发布</strong>：FastAPI将数据发布到Redis Stream原始数据流</li>
+                    <li><strong>并行分析</strong>：5个消费者组并行消费数据，执行专业故障分析</li>
+                    <li><strong>结果聚合</strong>：聚合器收集各分析结果，计算综合健康评分</li>
+                    <li><strong>实时转发</strong>：桥接组件监听结果流，通过WebSocket推送到前端</li>
+                    <li><strong>可视化展示</strong>：前端实时更新图表和状态信息</li>
+                </ol>
+            </div>
+
+            <!-- 部署架构 -->
+            <div class="section">
+                <h2><i class="fas fa-docker icon"></i>部署架构</h2>
+                <div class="deployment-arch">
+<pre>
+├── 数据源: realistic_vehicle_simulator.py (Python异步)
+├── 后端服务: FastAPI + Uvicorn (容器化)  
+├── 消息队列: Redis 7 Streams (Docker)
+├── 前端应用: Vue.js + Vite (Nginx代理)
+└── 监控管理: RedisInsight (Web界面)
+</pre>
+                </div>
+
+                <h3>Docker Compose配置</h3>
+                <div class="code-block">
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: vtox-redis
+    ports: ["6379:6379"]
+    command: redis-server --appendonly yes
+    
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    ports: ["8001:8001"]
+    depends_on: [redis]
+                </div>
+
+                <h3>启动10辆车模拟</h3>
+                <div class="code-block">
+# 启动模拟器
+python databases/realistic_vehicle_simulator.py
+
+# 支持的车型：
+# 1. 海豹 (深圳) - 粤B·SEAL·2024xxxxx
+# 2. 比亚迪秦 (西安) - 陕A·QIN·2024xxxxx  
+# 3. 比亚迪汉 (西安) - 陕A·HAN·2024xxxxx
+# 4. 唐 (广州) - 粤A·TANG·2024xxxxx
+# 5. 宋 (上海) - 沪A·SONG·2024xxxxx
+# 6. 元 (北京) - 京A·YUAN·2024xxxxx
+# 7. 海豚 (南京) - 苏A·DOLPHIN·2024xxxxx
+# 8. 海鸥 (杭州) - 浙A·SEAGULL·2024xxxxx
+# 9. 护卫舰07 (成都) - 川A·FRIGATE07·2024xxxxx
+# 10. 驱逐舰05 (重庆) - 渝A·DESTROYER05·2024xxxxx
+                </div>
+
+                <h3>系统要求</h3>
+                <ul class="feature-list">
+                    <li>操作系统：Windows 10+、Linux、macOS</li>
+                    <li>内存：推荐16GB以上</li>
+                    <li>CPU：4核心以上</li>
+                    <li>网络：低延迟网络环境</li>
+                    <li>存储：SSD推荐，50GB以上</li>
+                </ul>
+            </div>
+
+            <!-- 技术栈总结 -->
+            <div class="section">
+                <h2><i class="fas fa-stack-overflow icon"></i>技术栈总结</h2>
+                
+                <div class="layer-grid">
+                    <div class="layer-card">
+                        <h4><i class="fab fa-python icon"></i>后端技术</h4>
+                        <ul class="feature-list">
+                            <li>Python 3.8+</li>
+                            <li>FastAPI</li>
+                            <li>Redis Streams</li>
+                            <li>asyncio异步编程</li>
+                            <li>NumPy、SciPy科学计算</li>
+                            <li>Pandas数据处理</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fab fa-vuejs icon"></i>前端技术</h4>
+                        <ul class="feature-list">
+                            <li>Vue.js 3</li>
+                            <li>Element Plus UI</li>
+                            <li>Chart.js图表</li>
+                            <li>WebSocket通信</li>
+                            <li>Vite构建工具</li>
+                            <li>响应式设计</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-database icon"></i>数据存储</h4>
+                        <ul class="feature-list">
+                            <li>Redis 7 Streams</li>
+                            <li>消费者组机制</li>
+                            <li>数据持久化</li>
+                            <li>内存优化</li>
+                            <li>集群支持</li>
+                        </ul>
+                    </div>
+
+                    <div class="layer-card">
+                        <h4><i class="fas fa-tools icon"></i>开发工具</h4>
+                        <ul class="feature-list">
+                            <li>Docker容器化</li>
+                            <li>RedisInsight管理</li>
+                            <li>VS Code开发</li>
+                            <li>Git版本控制</li>
+                            <li>Postman API测试</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统优势 -->
+            <div class="section">
+                <h2><i class="fas fa-trophy icon"></i>系统优势</h2>
+                <div class="tech-highlights">
+                    <div class="tech-card">
+                        <i class="fas fa-business-time"></i>
+                        <h4>企业级</h4>
+                        <p>完善的分布式架构，支持大规模部署</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-rocket"></i>
+                        <h4>高性能</h4>
+                        <p>毫秒级响应，50Hz实时处理</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-brain"></i>
+                        <h4>智能化</h4>
+                        <p>5种专业故障算法，AI辅助诊断</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-eye"></i>
+                        <h4>可视化</h4>
+                        <p>实时图表展示，直观状态监控</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-expand"></i>
+                        <h4>可扩展</h4>
+                        <p>模块化设计，易于功能扩展</p>
+                    </div>
+                    <div class="tech-card">
+                        <i class="fas fa-shield-alt"></i>
+                        <h4>可靠性</h4>
+                        <p>容错机制，数据不丢失保障</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 车联网分布式电机故障诊断系统 | 基于Redis Stream的高性能分布式架构</p>
+            <p>文档生成时间：<span id="current-time"></span></p>
+        </div>
+    </div>
+
+    <script>
+        // 初始化Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#3498db',
+                primaryTextColor: '#2c3e50',
+                primaryBorderColor: '#2980b9',
+                lineColor: '#34495e',
+                secondaryColor: '#f39c12',
+                tertiaryColor: '#e74c3c'
+            }
+        });
+
+        // 显示当前时间
+        document.getElementById('current-time').textContent = new Date().toLocaleString('zh-CN');
+
+        // 添加滚动动画效果
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // 观察所有section元素
+        document.querySelectorAll('.section').forEach(section => {
+            section.style.opacity = '0';
+            section.style.transform = 'translateY(30px)';
+            section.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html> 
