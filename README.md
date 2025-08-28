@@ -11,6 +11,13 @@
 - **动态阈值配置**: 允许用户自定义警告和故障阈值，灵活适应不同应用场景
 - **可视化展示**: 通过图表直观展示诊断结果和关键参数
 
+
+<img width="1920" height="889" alt="wechat_2025-08-28_151642_802" src="https://github.com/user-attachments/assets/5f65ad09-6827-41fa-81cb-991202e56644" />
+
+
+
+
+
 ## 系统架构
 
 - **前端**: Vue3 + Vite + Element Plus + ECharts
